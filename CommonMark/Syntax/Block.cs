@@ -1,7 +1,5 @@
-﻿using CommonMark.Syntax;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace CommonMark.Syntax
 {
@@ -58,7 +56,8 @@ namespace CommonMark.Syntax
 #pragma warning disable 0618
             Block e = new Block(BlockTag.Document, 1, 1, 0);
 #pragma warning restore 0618
-            e.ReferenceMap = new Dictionary<string, Reference>();
+            e.Document = new DocumentData();
+            e.Document.ReferenceMap = new Dictionary<string, Reference>();
             e.Top = e;
             return e;
         }
@@ -132,13 +131,13 @@ namespace CommonMark.Syntax
         public bool IsLastLineBlank { get; set; }
 
         /// <summary>
-        /// Gets or sets the first child element of this instance. <c>null</c> if there are no children.
+        /// Gets or sets the first child element of this instance, or <see langword="null"/> if there are no children.
         /// </summary>
         public Block FirstChild { get; set; }
 
         /// <summary>
         /// Gets or sets the last child element (the last sibling of <see cref="FirstChild"/>) of this instance. 
-        /// <c>null</c> if there are no children.
+        /// <see langword="null"/> if there are no children.
         /// </summary>
         public Block LastChild { get; set; }
 
@@ -161,7 +160,7 @@ namespace CommonMark.Syntax
 
         /// <summary>
         /// Gets or sets the first inline element that was parsed from <see cref="StringContent"/> property.
-        /// Note that once the inlines are parsed, <see cref="StringContent"/> will be set to <c>null</c>.
+        /// Note that once the inlines are parsed, <see cref="StringContent"/> will be set to <see langword="null"/>.
         /// </summary>
         public Inline InlineContent { get; set; }
 
@@ -176,23 +175,53 @@ namespace CommonMark.Syntax
         public FencedCodeData FencedCodeData { get; set; }
 
         /// <summary>
+        /// Gets or sets the additional properties that apply to heading elements.
+        /// </summary>
+        public HeadingData Heading { get; set; }
+
+        /// <summary>
         /// Gets or sets the heading level (as in <c>&lt;h1&gt;</c> or <c>&lt;h2&gt;</c>).
         /// </summary>
-        public int HeaderLevel { get; set; }
+        [Obsolete("Use " + nameof(Heading) + " instead.")]
+        public int HeaderLevel
+        {
+            get { return Heading.Level; }
+            set { Heading = new HeadingData(value); }
+        }
 
         /// <summary>
-        /// Gets or sets the dictionary containing resolved link references. Only set on the document node, <c>null</c>
-        /// and not used for all other elements.
+        /// Gets or sets the additional properties that apply to document nodes.
         /// </summary>
-        public Dictionary<string, Reference> ReferenceMap { get; set; }
+        public DocumentData Document { get; set; }
 
         /// <summary>
-        /// Gets or sets the next sibling of this block element. <c>null</c> if this is the last element.
+        /// Obsolete. Use <see cref="Document"/> instead.
+        /// </summary>
+        [Obsolete("Use " + nameof(Document) + " instead.")]
+        public Dictionary<string, Reference> ReferenceMap
+        {
+            get { return Document?.ReferenceMap; }
+            set
+            {
+                if (Document == null)
+                {
+                    if (value == null)
+                    {
+                        return;
+                    }
+                    Document = new DocumentData();
+                }
+                Document.ReferenceMap = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the next sibling of this block element; <see langword="null"/> if this is the last element.
         /// </summary>
         public Block NextSibling { get; set; }
 
         /// <summary>
-        /// Gets or sets the previous sibling of this block element. <c>null</c> if this is the first element.
+        /// Gets or sets the previous sibling of this block element; <see langword="null"/> if this is the first element.
         /// </summary>
         [Obsolete("This property will be removed in future. If you have a use case where this property is required, please log an issue at https://github.com/Knagis/CommonMark.NET", false)]
         [System.Diagnostics.DebuggerBrowsable(System.Diagnostics.DebuggerBrowsableState.Never)]

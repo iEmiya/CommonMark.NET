@@ -1,10 +1,10 @@
 ﻿using CommonMark.Formatters;
 using CommonMark.Parser;
 using System;
-using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
+using System.Reflection;
 using System.Text;
+using System.Threading;
 
 namespace CommonMark
 {
@@ -13,26 +13,24 @@ namespace CommonMark
     /// </summary>
     public static class CommonMarkConverter
     {
-        private static Version _version = new Version(0, 0);
+        private static Lazy<Assembly> _assembly = new Lazy<Assembly>(InitializeAssembly, LazyThreadSafetyMode.None);
 
-#if NETCore
-        /// <summary>
-        /// Gets the CommonMark package version number.
-        /// </summary>
-        public static Version Version
+        private static Assembly Assembly
         {
-            get
-            {
-                if (_version.Major != 0 || _version.Minor != 0)
-                    return _version;
-                var assembly = System.Reflection.IntrospectionExtensions.GetTypeInfo(typeof(CommonMarkConverter)).Assembly;
-				_version = new System.Reflection.AssemblyName(assembly.FullName).Version;
-                return _version;
-            }
+            get { return _assembly.Value; }
         }
-#endif
 
-#if !NETCore
+        private static Assembly InitializeAssembly()
+        {
+#if NETCore || portable_259
+            return typeof(CommonMarkConverter).GetTypeInfo().Assembly;
+#else
+            return typeof(CommonMarkConverter).Assembly;
+#endif
+        }
+
+        private static Lazy<Version> _version = new Lazy<Version>(InitializeVersion, LazyThreadSafetyMode.None);
+
         /// <summary>
         /// Gets the CommonMark package version number.
         /// Note that this might differ from the actual assembly version which is updated less often to
@@ -42,31 +40,33 @@ namespace CommonMark
         {
             get
             {
-                if (_version.Major != 0 || _version.Minor != 0)
-                    return _version;
-
-                var assembly = typeof(CommonMarkConverter).Assembly;
-
-                // System.Xml is not available so resort to string parsing.
-                using (var stream = assembly.GetManifestResourceStream("CommonMark.Properties.CommonMark.NET.nuspec"))
-                using (var reader = new System.IO.StreamReader(stream, Encoding.UTF8))
-                {
-                    string line;
-                    while ((line = reader.ReadLine()) != null)
-                    {
-                        var i = line.IndexOf("<version>", StringComparison.Ordinal);
-                        if (i == -1)
-                            continue;
-
-                        i += 9;
-                        return _version = new Version(line.Substring(i, line.IndexOf("</version>", StringComparison.Ordinal) - i));
-                    }
-                }
-
-                return _version;
+                return _version.Value;
             }
         }
+
+        private static Version InitializeVersion()
+        {
+#if NETCore
+            return new AssemblyName(Assembly.FullName).Version;
+#else
+            // System.Xml is not available so resort to string parsing.
+            using (var stream = Assembly.GetManifestResourceStream("CommonMark.Properties.CommonMark.NET.nuspec"))
+            using (var reader = new System.IO.StreamReader(stream, Encoding.UTF8))
+            {
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    var i = line.IndexOf("<version>", StringComparison.Ordinal);
+                    if (i == -1)
+                        continue;
+
+                    i += 9;
+                    return new Version(line.Substring(i, line.IndexOf("</version>", StringComparison.Ordinal) - i));
+                }
+            }
+            return null;
 #endif
+        }
 
         /// <summary>
         /// Gets the CommonMark assembly version number. Note that might differ from the actual release version
@@ -79,13 +79,7 @@ namespace CommonMark
         {
             get
             {
-#if NETCore
-                var assembly = System.Reflection.IntrospectionExtensions.GetTypeInfo(typeof(CommonMarkConverter)).Assembly;
-#else
-                var assembly = typeof(CommonMarkConverter).Assembly;
-#endif
-                var aName = new System.Reflection.AssemblyName(assembly.FullName);
-                return aName.Version;
+                return new AssemblyName(Assembly.FullName).Version;
             }
         }
 
@@ -95,7 +89,7 @@ namespace CommonMark
         /// <param name="source">The reader that contains the source data.</param>
         /// <param name="settings">The object containing settings for the parsing process.</param>
         /// <returns>The block element that represents the document.</returns>
-        /// <exception cref="ArgumentNullException">when <paramref name="source"/> is <c>null</c></exception>
+        /// <exception cref="ArgumentNullException">when <paramref name="source"/> is <see langword="null"/></exception>
         /// <exception cref="CommonMarkException">when errors occur during block parsing.</exception>
         /// <exception cref="IOException">when error occur while reading the data.</exception>
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Advanced)] 
@@ -160,7 +154,7 @@ namespace CommonMark
         /// <param name="document">The top level document element.</param>
         /// <param name="settings">The object containing settings for the parsing process.</param>
         /// <exception cref="ArgumentException">when <paramref name="document"/> does not represent a top level document.</exception>
-        /// <exception cref="ArgumentNullException">when <paramref name="document"/> is <c>null</c></exception>
+        /// <exception cref="ArgumentNullException">when <paramref name="document"/> is <see langword="null"/></exception>
         /// <exception cref="CommonMarkException">when errors occur during inline parsing.</exception>
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Advanced)] 
         public static void ProcessStage2(Syntax.Block document, CommonMarkSettings settings = null)
@@ -176,7 +170,7 @@ namespace CommonMark
 
             try
             {
-                BlockMethods.ProcessInlines(document, document.ReferenceMap, settings);
+                BlockMethods.ProcessInlines(document, document.Document, settings);
             }
             catch(CommonMarkException)
             {
@@ -195,7 +189,7 @@ namespace CommonMark
         /// <param name="target">The target text writer where the result will be written to.</param>
         /// <param name="settings">The object containing settings for the formatting process.</param>
         /// <exception cref="ArgumentException">when <paramref name="document"/> does not represent a top level document.</exception>
-        /// <exception cref="ArgumentNullException">when <paramref name="document"/> or <paramref name="target"/> is <c>null</c></exception>
+        /// <exception cref="ArgumentNullException">when <paramref name="document"/> or <paramref name="target"/> is <see langword="null"/></exception>
         /// <exception cref="CommonMarkException">when errors occur during formatting.</exception>
         /// <exception cref="IOException">when error occur while writing the data to the target.</exception>
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Advanced)] 
@@ -252,7 +246,7 @@ namespace CommonMark
         /// </summary>
         /// <param name="source">The reader that contains the source data.</param>
         /// <param name="settings">The object containing settings for the parsing and formatting process.</param>
-        /// <exception cref="ArgumentNullException">when <paramref name="source"/> is <c>null</c></exception>
+        /// <exception cref="ArgumentNullException">when <paramref name="source"/> is <see langword="null"/></exception>
         /// <exception cref="CommonMarkException">when errors occur during parsing.</exception>
         /// <exception cref="IOException">when error occur while reading or writing the data.</exception>
         public static Syntax.Block Parse(TextReader source, CommonMarkSettings settings = null)
@@ -271,7 +265,7 @@ namespace CommonMark
         /// </summary>
         /// <param name="source">The source data.</param>
         /// <param name="settings">The object containing settings for the parsing and formatting process.</param>
-        /// <exception cref="ArgumentNullException">when <paramref name="source"/> is <c>null</c></exception>
+        /// <exception cref="ArgumentNullException">when <paramref name="source"/> is <see langword="null"/></exception>
         /// <exception cref="CommonMarkException">when errors occur during parsing.</exception>
         /// <exception cref="IOException">when error occur while reading or writing the data.</exception>
         public static Syntax.Block Parse(string source, CommonMarkSettings settings = null)
@@ -289,7 +283,7 @@ namespace CommonMark
         /// <param name="source">The reader that contains the source data.</param>
         /// <param name="target">The target text writer where the result will be written to.</param>
         /// <param name="settings">The object containing settings for the parsing and formatting process.</param>
-        /// <exception cref="ArgumentNullException">when <paramref name="source"/> or <paramref name="target"/> is <c>null</c></exception>
+        /// <exception cref="ArgumentNullException">when <paramref name="source"/> or <paramref name="target"/> is <see langword="null"/></exception>
         /// <exception cref="CommonMarkException">when errors occur during parsing or formatting.</exception>
         /// <exception cref="IOException">when error occur while reading or writing the data.</exception>
         public static void Convert(TextReader source, TextWriter target, CommonMarkSettings settings = null)

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -16,8 +17,8 @@ namespace CommonMark.Formatters
         private static readonly char[] EscapeHtmlAmpersand = "&amp;".ToCharArray();
         private static readonly char[] EscapeHtmlQuote = "&quot;".ToCharArray();
 
-        private static readonly string[] HeaderOpenerTags = { "<h1>", "<h2>", "<h3>", "<h4>", "<h5>", "<h6>" };
-        private static readonly string[] HeaderCloserTags = { "</h1>", "</h2>", "</h3>", "</h4>", "</h5>", "</h6>" };
+        private static readonly string[] HeadingOpenerTags = { "<h1>", "<h2>", "<h3>", "<h4>", "<h5>", "<h6>" };
+        private static readonly string[] HeadingCloserTags = { "</h1>", "</h2>", "</h3>", "</h4>", "</h5>", "</h6>" };
 
         private static readonly bool[] UrlSafeCharacters = {
             false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
@@ -292,11 +293,11 @@ namespace CommonMark.Formatters
                         visitChildren = true;
                         break;
 
-                    case BlockTag.AtxHeader:
-                    case BlockTag.SETextHeader:
+                    case BlockTag.AtxHeading:
+                    case BlockTag.SetextHeading:
                         writer.EnsureLine();
 
-                        x = block.HeaderLevel;
+                        x = block.Heading.Level;
 
                         if (trackPositions)
                         {
@@ -304,13 +305,13 @@ namespace CommonMark.Formatters
                             PrintPosition(writer, block);
                             writer.Write('>');
                             InlinesToHtml(writer, block.InlineContent, settings, inlineStack);
-                            writer.WriteLineConstant(x > 0 && x < 7 ? HeaderCloserTags[x - 1] : "</h" + x.ToString(CultureInfo.InvariantCulture) + ">");
+                            writer.WriteLineConstant(x > 0 && x < 7 ? HeadingCloserTags[x - 1] : "</h" + x.ToString(CultureInfo.InvariantCulture) + ">");
                         }
                         else
                         {
-                            writer.WriteConstant(x > 0 && x < 7 ? HeaderOpenerTags[x - 1] : "<h" + x.ToString(CultureInfo.InvariantCulture) + ">");
+                            writer.WriteConstant(x > 0 && x < 7 ? HeadingOpenerTags[x - 1] : "<h" + x.ToString(CultureInfo.InvariantCulture) + ">");
                             InlinesToHtml(writer, block.InlineContent, settings, inlineStack);
-                            writer.WriteLineConstant(x > 0 && x < 7 ? HeaderCloserTags[x - 1] : "</h" + x.ToString(CultureInfo.InvariantCulture) + ">");
+                            writer.WriteLineConstant(x > 0 && x < 7 ? HeadingCloserTags[x - 1] : "</h" + x.ToString(CultureInfo.InvariantCulture) + ">");
                         }
 
                         break;
@@ -343,7 +344,7 @@ namespace CommonMark.Formatters
 
                         break;
 
-                    case BlockTag.HorizontalRuler:
+                    case BlockTag.ThematicBreak:
                         if (trackPositions)
                         {
                             writer.WriteConstant("<hr");
@@ -384,7 +385,9 @@ namespace CommonMark.Formatters
                 {
                     var entry = stack.Pop();
 
-                    writer.WriteLineConstant(entry.Literal);
+                    if (entry.Literal != null)
+                        writer.WriteLineConstant(entry.Literal);
+
                     tight = entry.IsTight;
                     block = entry.Target;
                 }
@@ -448,6 +451,12 @@ namespace CommonMark.Formatters
                         stackLiteral = string.Empty;
                         stackWithinLink = withinLink;
                         visitChildren = true;
+                        break;
+
+                    case InlineTag.Placeholder:
+                        visitChildren = true;
+                        writer.Write('[');
+                        stackLiteral = "]";
                         break;
 
                     default:
@@ -619,6 +628,15 @@ namespace CommonMark.Formatters
                         stackLiteral = "</del>";
                         visitChildren = true;
                         stackWithinLink = withinLink;
+                        break;
+
+                    case InlineTag.Placeholder:
+                        // the slim formatter will treat placeholders like literals, without applying any further processing
+                        writer.Write('[');
+                        if (trackPositions) PrintPosition(writer, inline);
+                        stackLiteral = "]";
+                        stackWithinLink = withinLink;
+                        visitChildren = true;
                         break;
 
                     default:

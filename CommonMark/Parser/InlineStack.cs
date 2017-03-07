@@ -14,12 +14,12 @@ namespace CommonMark.Parser
         public InlineStackPriority Priority;
 
         /// <summary>
-        /// Previous entry in the stack. <c>null</c> if this is the last one.
+        /// Previous entry in the stack; <see langword="null"/> if this is the last one.
         /// </summary>
         public InlineStack Previous;
 
         /// <summary>
-        /// Next entry in the stack. <c>null</c> if this is the last one.
+        /// Next entry in the stack; <see langword="null"/> if this is the last one.
         /// </summary>
         public InlineStack Next;
 
@@ -29,14 +29,14 @@ namespace CommonMark.Parser
         public Inline StartingInline;
 
         /// <summary>
-        /// The number of delimeter characters found for this opener.
+        /// The number of delimiter characters found for this opener.
         /// </summary>
-        public int DelimeterCount;
+        public int DelimiterCount;
 
         /// <summary>
         /// The character that was used in the opener.
         /// </summary>
-        public char Delimeter;
+        public char Delimiter;
 
         /// <summary>
         /// The position in the <see cref="Subject.Buffer"/> where this inline element was found.
@@ -55,7 +55,12 @@ namespace CommonMark.Parser
             None = 0,
             Opener = 1,
             Closer = 2,
-            ImageLink = 4
+            ImageLink = 4,
+            /// <summary>
+            /// The <c>Closer</c> flag will be removed during incremental processing. However some parts of the parser
+            /// requires knowledge if the delimiter was ever considered to be a closer so this flag would then be used.
+            /// </summary>
+            CloserOriginally = 8
         }
 
         public enum InlineStackPriority : byte
@@ -65,10 +70,11 @@ namespace CommonMark.Parser
             Maximum = Links
         }
 
-        public static InlineStack FindMatchingOpener(InlineStack seachBackwardsFrom, InlineStackPriority priority, char delimeter, out bool canClose)
+        public static InlineStack FindMatchingOpener(InlineStack searchBackwardsFrom, InlineStackPriority priority, 
+            char delimiter, int closerDelimiterCount, bool closerCanOpen, out bool canClose)
         {
             canClose = true;
-            var istack = seachBackwardsFrom;
+            var istack = searchBackwardsFrom;
             while (true)
             {
                 if (istack == null)
@@ -79,7 +85,7 @@ namespace CommonMark.Parser
                 }
 
                 if (istack.Priority > priority ||
-                    (istack.Delimeter == delimeter && 0 != (istack.Flags & InlineStackFlags.Closer)))
+                    (istack.Delimiter == delimiter && 0 != (istack.Flags & InlineStackFlags.Closer)))
                 {
                     // there might be a closer further back but we cannot go there yet because a higher priority element is blocking
                     // the other option is that the stack entry could be a closer for the same char - this means
@@ -87,8 +93,17 @@ namespace CommonMark.Parser
                     return null;
                 }
 
-                if (istack.Delimeter == delimeter)
-                    return istack;
+                if (istack.Delimiter == delimiter) {
+
+                    // interior closer of size 2 does not match opener of size 1 and vice versa.
+                    // for more details, see https://github.com/jgm/cmark/commit/c50197bab81d7105c9c790548821b61bcb97a62a
+                    var oddMatch = (closerCanOpen || (istack.Flags & InlineStackFlags.CloserOriginally) > 0)
+                        && istack.DelimiterCount != closerDelimiterCount
+                        && ((istack.DelimiterCount + closerDelimiterCount) % 3 == 0);
+
+                    if (!oddMatch)
+                        return istack;
+                }
 
                 istack = istack.Previous;
             }
@@ -112,8 +127,8 @@ namespace CommonMark.Parser
         /// Removes a subset of the stack.
         /// </summary>
         /// <param name="first">The first entry to be removed.</param>
-        /// <param name="subj">The subject associated with this stack. Can be <c>null</c> if the pointers in the subject should not be updated.</param>
-        /// <param name="last">The last entry to be removed. Can be <c>null</c> if everything starting from <paramref name="first"/> has to be removed.</param>
+        /// <param name="subj">The subject associated with this stack. Can be <see langword="null"/> if the pointers in the subject should not be updated.</param>
+        /// <param name="last">The last entry to be removed. Can be <see langword="null"/> if everything starting from <paramref name="first"/> has to be removed.</param>
         public static void RemoveStackEntry(InlineStack first, Subject subj, InlineStack last)
         {
             var curPriority = first.Priority;
@@ -179,20 +194,20 @@ namespace CommonMark.Parser
                     else if (0 != (istack.Flags & InlineStackFlags.Closer))
                     {
                         bool canClose;
-                        var iopener = FindMatchingOpener(istack.Previous, istack.Priority, istack.Delimeter, out canClose);
+                        var iopener = FindMatchingOpener(istack.Previous, istack.Priority, istack.Delimiter, istack.DelimiterCount, (istack.Flags & InlineStackFlags.Opener) > 0, out canClose);
                         if (iopener != null)
                         {
                             bool retry = false;
-                            if (iopener.Delimeter == '~')
+                            if (iopener.Delimiter == '~')
                             {
-                                InlineMethods.MatchInlineStack(iopener, subj, istack.DelimeterCount, istack, null, InlineTag.Strikethrough);
-                                if (istack.DelimeterCount > 1)
+                                InlineMethods.MatchInlineStack(iopener, subj, istack.DelimiterCount, istack, (InlineTag)0, InlineTag.Strikethrough);
+                                if (istack.DelimiterCount > 1)
                                     retry = true;
                             }
                             else
                             {
-                                var useDelims = InlineMethods.MatchInlineStack(iopener, subj, istack.DelimeterCount, istack, InlineTag.Emphasis, InlineTag.Strong);
-                                if (istack.DelimeterCount > 0)
+                                var useDelims = InlineMethods.MatchInlineStack(iopener, subj, istack.DelimiterCount, istack, InlineTag.Emphasis, InlineTag.Strong);
+                                if (istack.DelimiterCount > 0)
                                     retry = true;
                             }
 

@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace CommonMark.Syntax
 {
@@ -72,13 +70,14 @@ namespace CommonMark.Syntax
         /// <summary>
         /// Initializes a new instance of the <see cref="Inline"/> class. The element type is set to <see cref="InlineTag.String"/>
         /// </summary>
-        internal Inline(string content, int startIndex, int length, int sourcePosition, int sourceLastPosition)
+        internal Inline(string content, int startIndex, int length, int sourcePosition, int sourceLastPosition, char delimiterCharacter)
         {
             this.LiteralContentValue.Source = content;
             this.LiteralContentValue.StartIndex = startIndex;
             this.LiteralContentValue.Length = length; 
             this.SourcePosition = sourcePosition;
             this.SourceLastPosition = sourceLastPosition;
+            this.Emphasis = new EmphasisData(delimiterCharacter);
         }
 
         /// <summary>
@@ -180,7 +179,7 @@ namespace CommonMark.Syntax
         private Inline _next;
 
         /// <summary>
-        /// Gets the next sibling inline element. Returns <c>null</c> if this is the last element.
+        /// Gets the next sibling inline element. Returns <see langword="null"/> if this is the last element.
         /// </summary>
         public Inline NextSibling
         {
@@ -205,5 +204,10 @@ namespace CommonMark.Syntax
                 return x;
             }
         }
+
+        /// <summary>
+        /// Gets the additional properties that apply to emphasis elements.
+        /// </summary>
+        public EmphasisData Emphasis { get; }
     }
 }

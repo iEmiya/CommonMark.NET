@@ -1,13 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace CommonMark.Syntax
 {
     /// <summary>
     /// Specifies the element type of an <see cref="Inline"/> instance.
     /// </summary>
-    public enum InlineTag
+    public enum InlineTag : byte
     {
         /// <summary>
         /// Represents a simple literal string content. Uses <see cref="Inline.LiteralContent"/> to specify the data.
@@ -72,6 +70,14 @@ namespace CommonMark.Syntax
         /// Represents an inline element that has been "removed" (visually represented as strikethrough).
         /// Only present if the <see cref="CommonMarkAdditionalFeatures.StrikethroughTilde"/> is enabled.
         /// </summary>
-        Strikethrough
+        Strikethrough,
+
+        /// <summary>
+        /// Represents a placeholder for context-specific features (substituted by the host application).
+        /// If the host application does not process the placeholder, or the formatter does not support processing
+        /// of placeholders, the placeholder will be rendered as text, including its delimiters.
+        /// Only present if the <see cref="CommonMarkAdditionalFeatures.PlaceholderBracket"/> is enabled.
+        /// </summary>
+        Placeholder
     }
 }

@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace CommonMark.Tests
@@ -35,13 +33,13 @@ namespace CommonMark.Tests
 
         [TestMethod]
         [TestCategory("SourcePosition - Blocks")]
-        public void SourcePositionSETextHeader()
+        public void SourcePositionSETextHeading()
         {
             var data = "foo\n\nbaz\n===\n\nbar";
             var doc = Helpers.ParseDocument(data, Settings);
 
             var code = doc.AsEnumerable()
-                .FirstOrDefault(o => o.Block != null && o.Block.Tag == Syntax.BlockTag.SETextHeader);
+                .FirstOrDefault(o => o.Block != null && o.Block.Tag == Syntax.BlockTag.SetextHeading);
 
             Assert.IsNotNull(code);
             Assert.AreEqual("baz\n===\n",
@@ -50,13 +48,13 @@ namespace CommonMark.Tests
 
         [TestMethod]
         [TestCategory("SourcePosition - Blocks")]
-        public void SourcePositionAtxHeader()
+        public void SourcePositionAtxHeading()
         {
             var data = "foo\n\n## baz\n\nbar";
             var doc = Helpers.ParseDocument(data, Settings);
 
             var code = doc.AsEnumerable()
-                .FirstOrDefault(o => o.Block != null && o.Block.Tag == Syntax.BlockTag.AtxHeader);
+                .FirstOrDefault(o => o.Block != null && o.Block.Tag == Syntax.BlockTag.AtxHeading);
 
             Assert.IsNotNull(code);
             Assert.AreEqual("## baz\n",
@@ -65,13 +63,13 @@ namespace CommonMark.Tests
 
         [TestMethod]
         [TestCategory("SourcePosition - Blocks")]
-        public void SourcePositionHorizontalRuler()
+        public void SourcePositionThematicBreak()
         {
             var data = "foo\n\n----\n\nbar";
             var doc = Helpers.ParseDocument(data, Settings);
 
             var code = doc.AsEnumerable()
-                .FirstOrDefault(o => o.Block != null && o.Block.Tag == Syntax.BlockTag.HorizontalRuler);
+                .FirstOrDefault(o => o.Block != null && o.Block.Tag == Syntax.BlockTag.ThematicBreak);
 
             Assert.IsNotNull(code);
             Assert.AreEqual("----\n",
@@ -656,6 +654,81 @@ third";
             var inline = doc.AsEnumerable().FirstOrDefault(o => o.Inline != null && o.Inline.Tag == Syntax.InlineTag.Emphasis);
             Assert.IsNotNull(inline);
             Assert.AreEqual("*asd*", data.Substring(inline.Inline.SourcePosition, inline.Inline.SourceLength));
+        }
+
+        [TestMethod]
+        [TestCategory("SourcePosition - HTML Blocks")]
+        public void SourcePositionHtmlBlock1()
+        {
+            var data = "<pre>\n</pre>\nfoo";
+            var doc = Helpers.ParseDocument(data, Settings);
+
+            var block = doc.AsEnumerable()
+                .FirstOrDefault(o => o.Block != null && o.Block.Tag == Syntax.BlockTag.HtmlBlock);
+
+            Assert.IsNotNull(block);
+            Assert.AreEqual("<pre>\n</pre>\n",
+                data.Substring(block.Block.SourcePosition, block.Block.SourceLength));
+        }
+
+        [TestMethod]
+        [TestCategory("SourcePosition - HTML Blocks")]
+        public void SourcePositionHtmlBlock1a()
+        {
+            var data = "<pre>\n</pre\n\n\nfoo";
+            var doc = Helpers.ParseDocument(data, Settings);
+
+            var block = doc.AsEnumerable()
+                .FirstOrDefault(o => o.Block != null && o.Block.Tag == Syntax.BlockTag.HtmlBlock);
+
+            Assert.IsNotNull(block);
+            Assert.AreEqual("<pre>\n</pre\n\n\nfoo",
+                data.Substring(block.Block.SourcePosition, block.Block.SourceLength));
+        }
+
+        [TestMethod]
+        [TestCategory("SourcePosition - HTML Blocks")]
+        public void SourcePositionHtmlBlock2()
+        {
+            var data = "<!--\n-->\nfoo";
+            var doc = Helpers.ParseDocument(data, Settings);
+
+            var block = doc.AsEnumerable()
+                .FirstOrDefault(o => o.Block != null && o.Block.Tag == Syntax.BlockTag.HtmlBlock);
+
+            Assert.IsNotNull(block);
+            Assert.AreEqual("<!--\n-->\n",
+                data.Substring(block.Block.SourcePosition, block.Block.SourceLength));
+        }
+
+        [TestMethod]
+        [TestCategory("SourcePosition - HTML Blocks")]
+        public void SourcePositionHtmlBlock6()
+        {
+            var data = "<div id='foo'>\r\nbar\r\n</div>\r\n\r\n";
+            var doc = Helpers.ParseDocument(data, Settings);
+
+            var block = doc.AsEnumerable()
+                .FirstOrDefault(o => o.Block != null && o.Block.Tag == Syntax.BlockTag.HtmlBlock);
+
+            Assert.IsNotNull(block);
+            Assert.AreEqual("<div id='foo'>\r\nbar\r\n</div>\r\n",
+                data.Substring(block.Block.SourcePosition, block.Block.SourceLength));
+        }
+
+        [TestMethod]
+        [TestCategory("SourcePosition - HTML Blocks")]
+        public void SourcePositionHtmlBlock7()
+        {
+            var data = "<fooobar>\r\nbar\r\n\r\nbar";
+            var doc = Helpers.ParseDocument(data, Settings);
+
+            var block = doc.AsEnumerable()
+                .FirstOrDefault(o => o.Block != null && o.Block.Tag == Syntax.BlockTag.HtmlBlock);
+
+            Assert.IsNotNull(block);
+            Assert.AreEqual("<fooobar>\r\nbar\r\n",
+                data.Substring(block.Block.SourcePosition, block.Block.SourceLength));
         }
     }
 }
