@@ -76,31 +76,6 @@ namespace CommonMark.Parser
             }
         }
 
-        /// <summary>
-        /// Break out of all containing lists
-        /// </summary>
-        private static void BreakOutOfLists(ref Block blockRef, LineInfo line)
-        {
-            Block container = blockRef;
-            Block b = container.Top;
-
-            // find first containing list:
-            while (b != null && b.Tag != BlockTag.List)
-                b = b.LastChild;
-
-            if (b != null)
-            {
-                while (container != null && container != b)
-                {
-                    Finalize(container, line);
-                    container = container.Parent;
-                }
-
-                Finalize(b, line);
-                blockRef = b.Parent;
-            }
-        }
-
         public static void Finalize(Block b, LineInfo line)
         {
             // don't do anything if the block is already closed
@@ -342,7 +317,7 @@ namespace CommonMark.Parser
         /// data with the details.  On failure, returns 0.
         /// </summary>
         /// <remarks>Original: int parse_list_marker(string ln, int pos, ref ListData dataptr)</remarks>
-        private static int ParseListMarker(string ln, int pos, out ListData data)
+        private static int ParseListMarker(string ln, int pos, bool interruptsParagraph, out ListData data)
         {
             char c;
             int startpos;
@@ -355,7 +330,11 @@ namespace CommonMark.Parser
             if (c == '+' || c == '•' || ((c == '*' || c == '-') && 0 == Scanner.scan_thematic_break(ln, pos, len)))
             {
                 pos++;
+
                 if (pos == len || !Utilities.IsWhitespace(ln[pos]))
+                    return 0;
+
+                if (interruptsParagraph && Scanner.scan_spacechars(ln, pos + 1, ln.Length) == ln.Length - pos - 1)
                     return 0;
 
                 data = new ListData();
@@ -382,6 +361,10 @@ namespace CommonMark.Parser
 
                 pos++;
                 if (pos == len || !Utilities.IsWhitespace(ln[pos]))
+                    return 0;
+
+                if (interruptsParagraph &&
+                    (start != 1 || Scanner.scan_spacechars(ln, pos + 1, ln.Length) == ln.Length - pos - 1))
                     return 0;
 
                 data = new ListData();
@@ -644,10 +627,6 @@ namespace CommonMark.Parser
 
             last_matched_container = container;
 
-            // check to see if we've hit 2nd blank line, break out of list:
-            if (blank && container.IsLastLineBlank)
-                BreakOutOfLists(ref container, line);
-
             var maybeLazy = cur.Tag == BlockTag.Paragraph;
 
             // unless last matched container is code block, try new container starts:
@@ -658,7 +637,7 @@ namespace CommonMark.Parser
 
                 FindFirstNonspace(ln, offset, column, out first_nonspace, out first_nonspace_column, out curChar);
 
-                indent = first_nonspace_column - column;
+                indent = first_nonspace_column - column + remainingSpaces;
                 blank = curChar == '\n';
 
                 var indented = indent >= CODE_INDENT;
@@ -725,7 +704,7 @@ namespace CommonMark.Parser
 
                 }
                 else if ((!indented || container.Tag == BlockTag.List) 
-                    && 0 != (matched = ParseListMarker(ln, first_nonspace, out data)))
+                    && 0 != (matched = ParseListMarker(ln, first_nonspace, container.Tag == BlockTag.Paragraph, out data)))
                 {
 
                     // compute padding:
